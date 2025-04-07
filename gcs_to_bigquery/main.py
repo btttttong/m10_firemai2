@@ -26,7 +26,10 @@ def delete_file_from_gcs(bucket_name, file_path):
     blob.delete()
     print(f"🗑️ Deleted file from GCS: gs://{bucket_name}/{file_path}")
 
+print("🟢 main.py loaded")
+
 def main(request):
+    print("🔥 Received request")
     envelope = request.get_json()
     if not envelope or 'message' not in envelope:
         return "❌ Invalid Pub/Sub format", 400
@@ -47,7 +50,7 @@ def main(request):
 if __name__ == "__main__":
     fake_data = {
         "bucket": "firemai",
-        "file_path": "firemai_data/hotspot_properties_20250407.json"
+        "file_path": "firemai_data/hotspot_properties_20250407154035.json"
     }
     fake_event = {
         "message": {
