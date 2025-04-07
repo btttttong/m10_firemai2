@@ -30,11 +30,10 @@ print("🟢 main.py loaded")
 
 def main(request):
     print("🔥 Received request")
-    envelope = request.get_json()
-    if not envelope or 'message' not in envelope:
-        return "❌ Invalid Pub/Sub format", 400
     try:
-        message = json.loads(base64.b64decode(envelope['message']['data']).decode("utf-8"))
+        message = request.get_json()
+        print("📦 Payload:", message)
+
         bucket = message["bucket"]
         file_path = message["file_path"]
 
@@ -48,15 +47,11 @@ def main(request):
     
 
 if __name__ == "__main__":
-    fake_data = {
-        "bucket": "firemai",
-        "file_path": "firemai_data/hotspot_properties_20250407154035.json"
-    }
-    fake_event = {
-        "message": {
-            "data": base64.b64encode(json.dumps(fake_data).encode("utf-8")).decode("utf-8")
-        }
-    }
     class FakeRequest:
-        def get_json(self): return fake_event
+        def get_json(self):
+            return {
+                "bucket": "firemai",
+                "file_path": "firemai_data/hotspot_properties_20250407161400.json"
+            }
+
     print(main(FakeRequest()))
