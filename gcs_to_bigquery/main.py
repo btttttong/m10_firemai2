@@ -31,16 +31,23 @@ print("🟢 main.py loaded")
 def main(request):
     print("🔥 Received request")
     try:
-        message = request.get_json()
+        message = request.get_json(silent=True)
         print("📦 Payload:", message)
 
-        bucket = message["bucket"]
-        file_path = message["file_path"]
+        if not message:
+            return "❌ No payload received", 400
+
+        bucket = message.get("bucket")
+        file_path = message.get("file_path")
+
+        if not bucket or not file_path:
+            return "❌ Missing bucket or file_path", 400
 
         load_json_from_gcs(bucket, file_path)
         delete_file_from_gcs(bucket, file_path)
 
         return "✅ GCS → BQ complete + file deleted", 200
+
     except Exception as e:
         print(f"❌ ERROR: {e}")
         return f"Error: {e}", 500
