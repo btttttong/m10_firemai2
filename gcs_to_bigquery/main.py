@@ -31,17 +31,19 @@ print("🟢 main.py loaded")
 def main(request):
     print("🔥 Received request")
     try:
-        message = request.get_json(silent=True)
+        message = request.get_json(silent=True, force=True)
         print("📦 Payload:", message)
 
         if not message:
-            return "❌ No payload received", 400
+            print("⚠️ No payload received")
+            return "✅ Empty payload. Ignored.", 200  # << ตอบ 200 ไปเลย
 
         bucket = message.get("bucket")
         file_path = message.get("file_path")
 
         if not bucket or not file_path:
-            return "❌ Missing bucket or file_path", 400
+            print("⚠️ Missing required fields")
+            return "✅ Missing bucket or file_path. Ignored.", 200
 
         load_json_from_gcs(bucket, file_path)
         delete_file_from_gcs(bucket, file_path)
@@ -50,7 +52,7 @@ def main(request):
 
     except Exception as e:
         print(f"❌ ERROR: {e}")
-        return f"Error: {e}", 500
+        return "✅ Handled exception. Ignored.", 200  # << สำคัญสุด!
     
 
 if __name__ == "__main__":
