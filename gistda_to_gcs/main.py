@@ -8,10 +8,10 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-API_URL = "https://disaster.gistda.or.th/api/1.0/documents/fire/hotspot/modis/7days"
-API_KEY = os.getenv("GISTDA_API_KEY")
+API_URL = "https://disaster.gistda.or.th/api/1.0/documents/fire/hotspot/modis/3days"
+API_KEY = os.getenv("API_KEY")
 BUCKET_NAME = os.getenv("BUCKET_NAME")
-SUBFOLDER = os.getenv("SUBFOLDER", "").rstrip("/")  # remove trailing slash if any
+SUBFOLDER = os.getenv("SUBFOLDER", "")
 
 def fetch_all_properties():
     headers = {"API-Key": API_KEY}
