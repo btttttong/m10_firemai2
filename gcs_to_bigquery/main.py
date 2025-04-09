@@ -1,4 +1,6 @@
-import os, json, base64
+import base64
+import json
+import os
 from google.cloud import bigquery, storage
 from dotenv import load_dotenv
 
@@ -9,58 +11,52 @@ DATASET = os.getenv("BQ_DATASET")
 TEMP_TABLE = os.getenv("TEMP_TABLE")
 
 def load_json_from_gcs(bucket_name, file_path):
-    client = bigquery.Client(project=PROJECT_ID)
-    uri = f"gs://{bucket_name}/{file_path}"
-    config = bigquery.LoadJobConfig(
-        source_format=bigquery.SourceFormat.NEWLINE_DELIMITED_JSON,
-        autodetect=True,
-        write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE,
-    )
-    client.load_table_from_uri(uri, f"{PROJECT_ID}.{DATASET}.{TEMP_TABLE}", job_config=config).result()
-    print(f"✅ Loaded: {file_path} to {TEMP_TABLE}")
+    try:
+        client = bigquery.Client(project=PROJECT_ID)
+        uri = f"gs://{bucket_name}/{file_path}"
+        config = bigquery.LoadJobConfig(
+            source_format=bigquery.SourceFormat.NEWLINE_DELIMITED_JSON,
+            autodetect=True,
+            write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE,
+        )
+        client.load_table_from_uri(uri, f"{PROJECT_ID}.{DATASET}.{TEMP_TABLE}", job_config=config).result()
+        print(f"✅ Loaded: {file_path} to {TEMP_TABLE}")
+    except Exception as e:
+        print(f"❌ Error loading to BigQuery: {e}")
 
 def delete_file_from_gcs(bucket_name, file_path):
-    storage_client = storage.Client()
-    bucket = storage_client.bucket(bucket_name)
-    blob = bucket.blob(file_path)
-    blob.delete()
-    print(f"🗑️ Deleted file from GCS: gs://{bucket_name}/{file_path}")
-
-print("🟢 main.py loaded")
+    try:
+        storage_client = storage.Client()
+        bucket = storage_client.bucket(bucket_name)
+        blob = bucket.blob(file_path)
+        blob.delete()
+        print(f"🗑️ Deleted file from GCS: gs://{bucket_name}/{file_path}")
+    except Exception as e:
+        print(f"❌ Error deleting file from GCS: {e}")
 
 def main(request):
-    print("🔥 Received request")
+    envelope = request.get_json()
+    if not envelope or 'message' not in envelope:
+        print("❌ Invalid Pub/Sub message")
+        return ("OK", 200)
+
+    pubsub_message = envelope['message']
     try:
-        message = request.get_json(silent=True, force=True)
-        print("📦 Payload:", message)
+        data = base64.b64decode(pubsub_message['data']).decode('utf-8')
+        print(f"🟢 Received message: {data}")
 
-        if not message:
-            print("⚠️ No payload received")
-            return "✅ Empty payload. Ignored.", 200  # << ตอบ 200 ไปเลย
+        attributes = pubsub_message.get("attributes", {})
+        bucket_name = attributes.get("bucketId")
+        file_path = attributes.get("objectId")
 
-        bucket = message.get("bucket")
-        file_path = message.get("file_path")
+        if not bucket_name or not file_path:
+            print("⚠️ Missing bucket or object path")
+            return ("OK", 200)
 
-        if not bucket or not file_path:
-            print("⚠️ Missing required fields")
-            return "✅ Missing bucket or file_path. Ignored.", 200
-
-        load_json_from_gcs(bucket, file_path)
-        delete_file_from_gcs(bucket, file_path)
-
-        return "✅ GCS → BQ complete + file deleted", 200
+        load_json_from_gcs(bucket_name, file_path)
+        delete_file_from_gcs(bucket_name, file_path)
 
     except Exception as e:
-        print(f"❌ ERROR: {e}")
-        return "✅ Handled exception. Ignored.", 200  # << สำคัญสุด!
-    
+        print(f"❌ Unexpected error: {e}")
 
-if __name__ == "__main__":
-    class FakeRequest:
-        def get_json(self):
-            return {
-                "bucket": "firemai",
-                "file_path": "firemai_data/hotspot_properties_20250407161400.json"
-            }
-
-    print(main(FakeRequest()))
+    return ("OK", 200)

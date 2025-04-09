@@ -1,4 +1,7 @@
-import os, time, json, requests
+import os
+import time
+import json
+import requests
 from datetime import datetime
 from google.cloud import storage
 from dotenv import load_dotenv
@@ -8,43 +11,59 @@ load_dotenv()
 API_URL = "https://disaster.gistda.or.th/api/1.0/documents/fire/hotspot/modis/7days"
 API_KEY = os.getenv("GISTDA_API_KEY")
 BUCKET_NAME = os.getenv("BUCKET_NAME")
-SUBFOLDER = os.getenv("SUBFOLDER")
+SUBFOLDER = os.getenv("SUBFOLDER", "").rstrip("/")  # remove trailing slash if any
 
 def fetch_all_properties():
     headers = {"API-Key": API_KEY}
     all_properties, offset = [], 0
+
     while True:
         params = {"limit": 1000, "offset": offset, "ct_tn": "ราชอาณาจักรไทย"}
-        r = requests.get(API_URL, headers=headers, params=params)
-        r.raise_for_status()
-        features = r.json().get("features", [])
-        if not features:
+        try:
+            r = requests.get(API_URL, headers=headers, params=params)
+            r.raise_for_status()
+            features = r.json().get("features", [])
+        except Exception as e:
+            print(f"❌ Error fetching data (offset={offset}): {e}")
             break
-        all_properties.extend([f["properties"] for f in features])
+
+        if not features:
+            print("✅ Fetched all data.")
+            break
+
+        batch = [f["properties"] for f in features]
+        all_properties.extend(batch)
+        print(f"📦 Retrieved {len(batch)} records (offset={offset})")
         offset += 1000
         time.sleep(0.5)
+
+    print(f"🎯 Total records fetched: {len(all_properties)}")
     return all_properties
 
 def upload_to_gcs(filename, gcs_path):
-    client = storage.Client()
-    bucket = client.bucket(BUCKET_NAME)
-    blob = bucket.blob(gcs_path)
-    blob.upload_from_filename(filename, content_type="application/json")
-    print(f"✅ Uploaded to GCS: gs://{BUCKET_NAME}/{gcs_path}")
+    try:
+        client = storage.Client()
+        bucket = client.bucket(BUCKET_NAME)
+        blob = bucket.blob(gcs_path)
+        blob.upload_from_filename(filename)
+        print(f"✅ Uploaded to GCS: gs://{BUCKET_NAME}/{gcs_path}")
+    except Exception as e:
+        print(f"❌ Failed to upload to GCS: {e}")
 
-def main(request):
-    timestamp = datetime.utcnow().strftime('%Y%m%d%H%M%S')
-    output_file = f"hotspot_properties_{timestamp}.json"
-    gcs_path = f"{SUBFOLDER}/{output_file}"
+def main():
     data = fetch_all_properties()
+    if not data:
+        print("⚠️ No data to save.")
+        return
 
-    with open(output_file, "w", encoding="utf-8") as out:
-        for row in data:
-            json.dump(row, out, ensure_ascii=False)
-            out.write("\n")
-    upload_to_gcs(output_file, gcs_path)
-    return f"✅ Uploaded {len(data)} records to GCS", 200
+    timestamp = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
+    local_filename = f"hotspot_{timestamp}.json"
+    with open(local_filename, "w", encoding="utf-8") as f:
+        for record in data:
+            f.write(json.dumps(record, ensure_ascii=False) + "\n")
+
+    gcs_filename = f"{SUBFOLDER}/hotspot_{timestamp}.json" if SUBFOLDER else f"hotspot_{timestamp}.json"
+    upload_to_gcs(local_filename, gcs_filename)
 
 if __name__ == "__main__":
-    class FakeRequest: pass
-    print(main(FakeRequest()))
+    main()
