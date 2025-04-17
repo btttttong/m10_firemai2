@@ -35,18 +35,29 @@ def delete_file_from_gcs(bucket_name, file_path):
         print(f"❌ Error deleting file from GCS: {e}")
 
 def main(request):
+    print("🚀 Cloud Run Triggered")
+
     try:
-        payload = request.get_json()
+        content_type = request.headers.get("Content-Type", "")
+        print(f"🧾 Content-Type: {content_type}")
+        print(f"📨 Raw body: {request.data}")
+
+        payload = request.get_json(silent=True)
+        if payload is None:
+            print("⚠️ request.get_json() returned None — invalid/malformed JSON?")
+            return "OK", 200
+
         print("📦 Incoming payload:", json.dumps(payload, indent=2))
 
-        # Case: unwrapped
+        # Case: unwrapped (Enable payload unwrapping = ✅)
         if "bucket" in payload and "name" in payload:
             bucket = payload["bucket"]
             name = payload["name"]
 
-        # Case: wrapped
+        # Case: wrapped (Enable payload unwrapping = ❌)
         elif "message" in payload and "data" in payload["message"]:
             decoded = base64.b64decode(payload["message"]["data"]).decode("utf-8")
+            print("🔓 Decoded Pub/Sub message:", decoded)
             message = json.loads(decoded)
             bucket = message.get("bucket")
             name = message.get("name")
@@ -65,4 +76,4 @@ def main(request):
     except Exception as e:
         print(f"❌ Error (but no retry): {e}")
 
-    return "OK", 200  # ✅ ไม่ว่าเกิดอะไร ก็จบแบบไม่ retry
+    return "OK", 200
