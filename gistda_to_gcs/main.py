@@ -50,6 +50,11 @@ def upload_to_gcs(filename, gcs_path):
 
 def main(request):
     print("🚀 Cloud Scheduler triggered")
+
+    if not API_KEY or not BUCKET_NAME:
+        print("⚠️ Missing required environment variables.")
+        return "Missing config", 500
+    
     try:
         message = request.get_json()
         print("📦 Message received:", message)
@@ -75,12 +80,12 @@ def main(request):
         traceback.print_exc()
         return "Error", 500
 
-class FakeRequest:
-    def get_json(self):
-        return {
-            "bucket": "firemai",
-            "file_path": "firemai_data"
-        }
+# class FakeRequest:
+#     def get_json(self):
+#         return {
+#             "bucket": "firemai",
+#             "file_path": "firemai_data"
+#         }
 
-if __name__ == "__main__":
-    main(FakeRequest())
+# if __name__ == "__main__":
+#     main(FakeRequest())

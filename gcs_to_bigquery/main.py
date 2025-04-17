@@ -12,6 +12,13 @@ TEMP_TABLE = os.getenv("TEMP_TABLE")
 
 def load_json_from_gcs(bucket_name, file_path):
     try:
+        storage_client = storage.Client()
+        bucket = storage_client.bucket(bucket_name)
+        blob = bucket.blob(file_path)
+        if not blob.exists():
+            print(f"⚠️ GCS file not found: {file_path}")
+            return
+
         client = bigquery.Client(project=PROJECT_ID)
         uri = f"gs://{bucket_name}/{file_path}"
         config = bigquery.LoadJobConfig(
@@ -67,6 +74,10 @@ def main(request):
 
         if not bucket or not name:
             print("⚠️ Missing bucket or file name")
+            return "OK", 200
+        
+        if not name.endswith(".json"):
+            print(f"⚠️ Skipping non-JSON file: {name}")
             return "OK", 200
 
         # ดำเนินการโหลดเข้า BigQuery + ลบไฟล์
