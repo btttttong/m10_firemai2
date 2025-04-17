@@ -48,6 +48,7 @@ def upload_to_gcs(filename, gcs_path):
     except Exception as e:
         print(f"❌ Failed to upload to GCS: {e}")
 
+
 def main(request):
     print("🚀 Cloud Scheduler triggered")
 
@@ -73,7 +74,12 @@ def main(request):
         gcs_filename = f"{SUBFOLDER}/hotspot_{timestamp}.json" if SUBFOLDER else f"hotspot_{timestamp}.json"
         upload_to_gcs(local_filename, gcs_filename)
 
-        return "✅ Done", 200
+        return {
+            "status": "success",
+            "timestamp": timestamp,
+            "record_count": len(data),
+            "gcs_path": f"gs://{BUCKET_NAME}/{gcs_filename}"
+        }, 200
 
     except Exception as e:
         print(f"❌ Error processing the request: {e}")
