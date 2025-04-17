@@ -35,28 +35,34 @@ def delete_file_from_gcs(bucket_name, file_path):
         print(f"❌ Error deleting file from GCS: {e}")
 
 def main(request):
-    envelope = request.get_json()
-    if not envelope or 'message' not in envelope:
-        print("❌ Invalid Pub/Sub message")
-        return ("OK", 200)
-
-    pubsub_message = envelope['message']
     try:
-        data = base64.b64decode(pubsub_message['data']).decode('utf-8')
-        print(f"🟢 Received message: {data}")
+        payload = request.get_json()
+        print("📦 Incoming payload:", json.dumps(payload, indent=2))
 
-        attributes = pubsub_message.get("attributes", {})
-        bucket_name = attributes.get("bucketId")
-        file_path = attributes.get("objectId")
+        # Case: unwrapped
+        if "bucket" in payload and "name" in payload:
+            bucket = payload["bucket"]
+            name = payload["name"]
 
-        if not bucket_name or not file_path:
-            print("⚠️ Missing bucket or object path")
-            return ("OK", 200)
+        # Case: wrapped
+        elif "message" in payload and "data" in payload["message"]:
+            decoded = base64.b64decode(payload["message"]["data"]).decode("utf-8")
+            message = json.loads(decoded)
+            bucket = message.get("bucket")
+            name = message.get("name")
+        else:
+            print("⚠️ Unrecognized message format")
+            return "OK", 200
 
-        load_json_from_gcs(bucket_name, file_path)
-        delete_file_from_gcs(bucket_name, file_path)
+        if not bucket or not name:
+            print("⚠️ Missing bucket or file name")
+            return "OK", 200
+
+        # ดำเนินการโหลดเข้า BigQuery + ลบไฟล์
+        load_json_from_gcs(bucket, name)
+        delete_file_from_gcs(bucket, name)
 
     except Exception as e:
-        print(f"❌ Unexpected error: {e}")
+        print(f"❌ Error (but no retry): {e}")
 
-    return ("OK", 200)
+    return "OK", 200  # ✅ ไม่ว่าเกิดอะไร ก็จบแบบไม่ retry
