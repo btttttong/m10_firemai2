@@ -4,6 +4,7 @@ import json
 import requests
 from datetime import datetime
 from google.cloud import storage
+import traceback
 
 API_URL = "https://disaster.gistda.or.th/api/1.0/documents/fire/hotspot/modis/3days"
 API_KEY = os.getenv("API_KEY")
@@ -56,7 +57,7 @@ def main(request):
         data = fetch_all_properties()
         if not data:
             print("⚠️ No data to save.")
-            return
+            return "No data", 204
 
         timestamp = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
         local_filename = f"hotspot_{timestamp}.json"
@@ -67,8 +68,11 @@ def main(request):
         gcs_filename = f"{SUBFOLDER}/hotspot_{timestamp}.json" if SUBFOLDER else f"hotspot_{timestamp}.json"
         upload_to_gcs(local_filename, gcs_filename)
 
+        return "✅ Done", 200
+
     except Exception as e:
         print(f"❌ Error processing the request: {e}")
+        traceback.print_exc()
         return "Error", 500
 
 class FakeRequest:
