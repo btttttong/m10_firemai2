@@ -4,9 +4,6 @@ import json
 import requests
 from datetime import datetime
 from google.cloud import storage
-from dotenv import load_dotenv
-
-load_dotenv()
 
 API_URL = "https://disaster.gistda.or.th/api/1.0/documents/fire/hotspot/modis/3days"
 API_KEY = os.getenv("API_KEY")
@@ -50,23 +47,12 @@ def upload_to_gcs(filename, gcs_path):
     except Exception as e:
         print(f"❌ Failed to upload to GCS: {e}")
 
-
-# Mocking the event and context parameters (as they would come from Cloud Pub/Sub)
-class FakeRequest:
-    def get_json(self):
-        return {
-            "bucket": "firemai",
-            "file_path": "firemai_data/hotspot_properties_20250407161400.json"
-        }
-
-def main(event, context):
-    print("🚀 Pub/Sub triggered")
+def main(request):
+    print("🚀 Cloud Scheduler triggered")
     try:
-        # Decode the incoming message
-        message = json.loads(base64.b64decode(event['data']).decode("utf-8"))
+        message = request.get_json()
         print("📦 Message received:", message)
 
-        # Perform tasks (fetch and upload)
         data = fetch_all_properties()
         if not data:
             print("⚠️ No data to save.")
@@ -83,8 +69,14 @@ def main(event, context):
 
     except Exception as e:
         print(f"❌ Error processing the request: {e}")
-        return "Error", 500  # Handle errors appropriately
+        return "Error", 500
 
+class FakeRequest:
+    def get_json(self):
+        return {
+            "bucket": "firemai",
+            "file_path": "firemai_data"
+        }
 
 if __name__ == "__main__":
-    main(FakeRequest(), None)  # Run locally with mock data
+    main(FakeRequest())
