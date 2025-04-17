@@ -50,20 +50,41 @@ def upload_to_gcs(filename, gcs_path):
     except Exception as e:
         print(f"❌ Failed to upload to GCS: {e}")
 
-def main():
-    data = fetch_all_properties()
-    if not data:
-        print("⚠️ No data to save.")
-        return
 
-    timestamp = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
-    local_filename = f"hotspot_{timestamp}.json"
-    with open(local_filename, "w", encoding="utf-8") as f:
-        for record in data:
-            f.write(json.dumps(record, ensure_ascii=False) + "\n")
+# Mocking the event and context parameters (as they would come from Cloud Pub/Sub)
+class FakeRequest:
+    def get_json(self):
+        return {
+            "bucket": "firemai",
+            "file_path": "firemai_data/hotspot_properties_20250407161400.json"
+        }
 
-    gcs_filename = f"{SUBFOLDER}/hotspot_{timestamp}.json" if SUBFOLDER else f"hotspot_{timestamp}.json"
-    upload_to_gcs(local_filename, gcs_filename)
+def main(event, context):
+    print("🚀 Pub/Sub triggered")
+    try:
+        # Decode the incoming message
+        message = json.loads(base64.b64decode(event['data']).decode("utf-8"))
+        print("📦 Message received:", message)
+
+        # Perform tasks (fetch and upload)
+        data = fetch_all_properties()
+        if not data:
+            print("⚠️ No data to save.")
+            return
+
+        timestamp = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
+        local_filename = f"hotspot_{timestamp}.json"
+        with open(local_filename, "w", encoding="utf-8") as f:
+            for record in data:
+                f.write(json.dumps(record, ensure_ascii=False) + "\n")
+
+        gcs_filename = f"{SUBFOLDER}/hotspot_{timestamp}.json" if SUBFOLDER else f"hotspot_{timestamp}.json"
+        upload_to_gcs(local_filename, gcs_filename)
+
+    except Exception as e:
+        print(f"❌ Error processing the request: {e}")
+        return "Error", 500  # Handle errors appropriately
+
 
 if __name__ == "__main__":
-    main()
+    main(FakeRequest(), None)  # Run locally with mock data
